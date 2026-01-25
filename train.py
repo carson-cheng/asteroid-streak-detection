@@ -10,13 +10,17 @@ import segmentation_models_pytorch as smp
 # For multi-class segmentation
 # mode can be 'binary', 'multiclass' or 'multilabel'
 loss_fn = smp.losses.FocalLoss(mode='multiclass', alpha=0.0004593042226938101, gamma=2.0)
-def train(net, positive_class_weight, lr, epochs, trainloader, valloader):
-    best_model_path = "best_model.pt"
+def train(net, positive_class_weight, lr, epochs, trainloader, valloader, best_model_path, loss):
     record = 0
     net = net.cuda()
     print(net)
-    criterion = nn.CrossEntropyLoss(weight=torch.tensor([1., positive_class_weight]).cuda())
-    #criterion = smp.losses.FocalLoss(mode='multiclass', gamma=2.0, alpha=0.25)
+    criterion = None
+    if loss == "crossentropy":
+        criterion = nn.CrossEntropyLoss(weight=torch.tensor([1., positive_class_weight]).cuda())
+    elif loss == "focalloss":
+        criterion = smp.losses.FocalLoss(mode='multiclass', gamma=2.0, alpha=0.25)
+    else:
+        raise ValueError("loss must be either 'crossentropy' or 'focalloss'.")
     #criterion = nn.BCEWithLogitsLoss(weight=torch.tensor([300.]))
     #criterion = nn.MSELoss()
     # there's some instability in training, and gradient of hard examples

@@ -2,6 +2,7 @@ import os
 import joblib
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
+from skimage.restoration import denoise_wavelet, denoise_bilateral
 import random
 from PIL import Image
 import numpy as np
@@ -11,53 +12,40 @@ import joblib
 image, coords = None, None
 transform = transforms.Compose([transforms.ToTensor()])
 class AsteroidImageDataset(Dataset):
-    def __init__(self, files, transform, train, negative=False):
-        self.files = files
+    def __init__(self, files, transform, train, config, negative=False):
+        #self.files = files
         self.transform = transform
         self.train = train
         self.negative = negative
-        self.filter = True
+        self.cache = os.listdir(f"./data")
+        self.cache = [x for x in self.cache if (".joblib" in x and f"{self.train}" in x)]
+        self.config = config
+        self.filter = self.config['filter']
+        print(len(self.cache))
     def __len__(self):
-        return len(self.files)
+        return len(self.cache)
     def __getitem__(self, idx):
-        fn = self.files[idx]
-        cache_fn = f"./data/{self.train}_{idx}.joblib"
+        #fn = self.files[idx]
+        cache_fn = os.path.join("./data", self.cache[idx])
         if os.path.exists(cache_fn):
             (patch, mask) = joblib.load(cache_fn)
             
             # Apply transform first
             transformed = self.transform(patch)  # Should be a tensor
-            if self.filter == True:
-                # Convert to numpy for median filtering
+            if self.filter != "none":
                 transformed_np = transformed.numpy()
-                
-                # Check the shape and handle accordingly
-                if transformed_np.ndim == 3:
-                    # If it's 3D with channel dimension first (C, H, W)
-                    if transformed_np.shape[0] == 1:  # Single channel
-                        # Squeeze to 2D for median filter
-                        transformed_np = transformed_np.squeeze(0)
-                        # Apply median filter
-                        from skimage.filters import median
-                        from skimage.morphology import square
-                        transformed_np = median(transformed_np, square(3))
-                        # Add channel dimension back
-                        transformed_np = transformed_np[np.newaxis, :, :]
-                    elif transformed_np.shape[0] == 3:  # RGB
-                        # Apply median filter to each channel
-                        transformed_filtered = np.zeros_like(transformed_np)
-                        for c in range(3):
-                            transformed_filtered[c] = median(transformed_np[c], square(3))
-                        transformed_np = transformed_filtered
-                elif transformed_np.ndim == 2:
-                    # Already 2D, apply median filter directly
-                    from skimage.filters import median
-                    from skimage.morphology import square
+                transformed_np = transformed_np.squeeze(0)
+                # Apply median filter
+                from skimage.filters import median
+                from skimage.morphology import square
+                if self.filter == "median":
                     transformed_np = median(transformed_np, square(3))
-                    # Add channel dimension for PyTorch
-                    transformed_np = transformed_np[np.newaxis, :, :]
-                
-                # Convert back to tensor
+                elif self.filter == "bilateral":
+                    transformed_np = denoise_bilateral(transformed_np)
+                else:
+                    raise ValueError("filter in config should be either 'none', 'median', or 'bilateral'.")
+                # Add channel dimension back
+                transformed_np = transformed_np[np.newaxis, :, :]
                 transformed = torch.tensor(transformed_np)
             return transformed, mask
         (image, coords) = joblib.load(fn)
@@ -134,7 +122,7 @@ class AsteroidImageDataset(Dataset):
                 return patch, mask
         print("Error!")
         
-def load_data():
+def load_data(config):
     from skimage.filters import median
     from skimage.morphology import square
     root = "./near-earth-asteroids"
@@ -145,8 +133,8 @@ def load_data():
     files = [os.path.join(root, x) for x in os.listdir(root) if "joblib" in x]
     threshold = int(len(files) * 0.8)
     train_files, val_files = files[:threshold], files[threshold:]
-    train_ds = AsteroidImageDataset(train_files, transform, True)
-    val_ds = AsteroidImageDataset(val_files, transform, False)
+    train_ds = AsteroidImageDataset(train_files, transform, True, config)
+    val_ds = AsteroidImageDataset(val_files, transform, False, config)
     trainloader = DataLoader(train_ds, batch_size=16, shuffle=True, num_workers=4)
     valloader = DataLoader(val_ds, batch_size=16, shuffle=False, num_workers=4)
     return train_ds, val_ds, trainloader, valloader
