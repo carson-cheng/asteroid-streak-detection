@@ -3,6 +3,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 import numpy as np
 a, b, wcs = None, None, None
+year = 2021
 def get_asteroid_image(obj_name, date, fracdays, filename=None, idx="auto", style="diff"):
     global a, b, wcs
     # date: (year, month, day)
@@ -77,6 +78,11 @@ def get_asteroid_image(obj_name, date, fracdays, filename=None, idx="auto", styl
 #image, coords = get_asteroid_image("1862")
 import os, requests
 import joblib
+filenames = ['Apollos.txt', 'Amors.txt', 'Atens.txt']
+asteroids = []
+for file in filenames:
+    lns = open(file).read().split("\n")
+    asteroids.extend([x.split()[0] + " " + x.split()[1] for x in lns if (len(x.split()) > 0 and x.split()[0] == '2022')])
 for asteroid in asteroids:
     try:
         print(asteroid)

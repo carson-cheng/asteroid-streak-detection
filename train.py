@@ -115,13 +115,3 @@ def train(net, positive_class_weight, lr, epochs, trainloader, valloader, best_m
                 record = score
     net.load_state_dict(torch.load(best_model_path))
     return net, record
-    # first step: weighted CE loss; consider doing normalization
-    # second step: gaussian target weighting, label propagation (propagate labels through bright patches to get better annotations)
-    # and incorporate classification loss in the loss function (CE loss of prob of greatest probability pixel wrt whether asteroid is present or not)
-    # compare performance with deepstreaks (2019) and that 2025 paper
-    # https://arxiv.org/html/2405.14238v1 
-    # focal loss on the more challenging negatives (assign greater weight to high confidence positive, yet negative pixels)
-    
-    # an idea from deepstreaks or other papers: use curriculum learning
-    # start with easier samples with longer streaks (larger streak area)
-    # and then go to harder ones with shorter streaks and negative samples
